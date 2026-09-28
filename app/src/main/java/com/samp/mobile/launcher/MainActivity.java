@@ -167,53 +167,39 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(String response) {
                 try {
+                    if (response == null || response.trim().isEmpty()) {
+                        Log.e("MainActivity", "Received empty response from hosted.json");
+                        return;
+                    }
                     JSONObject jsonObject  = new JSONObject(new String(response.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8));
-                    JSONArray jsonArray = jsonObject.getJSONArray("query");
-                    for(int i = 0; i<jsonArray.length(); i++) {
-                        JSONObject jSONObject = jsonArray.getJSONObject(i);
-                        SAMPServerInfo sAMPServerInfo = new SAMPServerInfo();
-                        sAMPServerInfo.setId(jSONObject.getInt("number"));
-                        sAMPServerInfo.setServerName(jSONObject.getString("name"));
-                        sAMPServerInfo.setAddress(jSONObject.getString("ip"));
-                        sAMPServerInfo.setPort(jSONObject.getInt("port"));
-                        sAMPServerInfo.setCurrentPlayerCount(jSONObject.getInt("online"));
-                        sAMPServerInfo.setMaxPlayerCount(jSONObject.getInt("maxplayers"));
-                        sAMPServerInfo.setHasPassword(jSONObject.getBoolean("password"));
-                        sAMPServerInfo.setServerStatus(SAMPServerInfo.Status.ONLINE);
-                        sAMPServerInfo.setPing(12);
-                        getServerList().add(sAMPServerInfo);
-                    }
-                } catch (JSONException e) {
-                    throw new RuntimeException(e);
-                }
-
-                for (Fragment fragment : getSupportFragmentManager().getFragments()) {
-                    if (fragment instanceof ServersFragment) {
-                        while (!fragment.isAdded()) {
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                        if(fragment.isAdded()) {
-                            for (Fragment fragment2 : fragment.getChildFragmentManager().getFragments()) {
-                                if ((fragment2 instanceof ServerPagesItemFragment) && ((ServerPagesItemFragment) fragment2).getPage() == 1 && fragment2.getView() != null) {
-                                    Log.d("AXL", "getserverslist");
-                                    ((RecyclerView.Adapter) Objects.requireNonNull(((RecyclerView) ((View) fragment2.requireView()).findViewById(R.id.server_recycler)).getAdapter())).notifyDataSetChanged();
-                                }
-                            }
+                    if (jsonObject.has("query")) {
+                        JSONArray jsonArray = jsonObject.getJSONArray("query");
+                        for(int i = 0; i<jsonArray.length(); i++) {
+                            JSONObject jSONObject = jsonArray.getJSONObject(i);
+                            SAMPServerInfo sAMPServerInfo = new SAMPServerInfo();
+                            sAMPServerInfo.setId(jSONObject.getInt("number"));
+                            sAMPServerInfo.setServerName(jSONObject.getString("name"));
+                            sAMPServerInfo.setAddress(jSONObject.getString("ip"));
+                            sAMPServerInfo.setPort(jSONObject.getInt("port"));
+                            sAMPServerInfo.setCurrentPlayerCount(jSONObject.getInt("online"));
+                            sAMPServerInfo.setMaxPlayerCount(jSONObject.getInt("maxplayers"));
+                            sAMPServerInfo.setHasPassword(jSONObject.getBoolean("password"));
+                            sAMPServerInfo.setServerStatus(SAMPServerInfo.Status.ONLINE);
+                            sAMPServerInfo.setPing(12);
+                            getServerList().add(sAMPServerInfo);
                         }
                     }
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Failed to parse hosted.json: " + e.getMessage());
                 }
 
+                refreshHostedServers();
                 z[0] = true;
             }
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
                 Log.d("x1y2z", "error " + error.toString());
-                getServersInfo();
                 z[0] = false;
             }
         }));
@@ -265,37 +251,60 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void refreshFavoriteServers()
+    public void refreshHostedServers()
     {
-        for (Fragment fragment : getSupportFragmentManager().getFragments()) {
-            if (fragment instanceof ServersFragment) {
-                while (!fragment.isAdded()) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-                if(fragment.isAdded()) {
-                    for (Fragment fragment2 : fragment.getChildFragmentManager().getFragments()) {
-                        if ((fragment2 instanceof ServerPagesItemFragment) && ((ServerPagesItemFragment) fragment2).getPage() == 0 && fragment2 != null) {
-                            RecyclerView view = Objects.requireNonNull( fragment2.requireView().findViewById(R.id.server_recycler));
-                            if(view != null) {
-                                RecyclerView.Adapter adapter = view.getAdapter();
-                                if(adapter != null) {
-                                    view.post(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            adapter.notifyDataSetChanged();
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+                        if (fragment instanceof ServersFragment && fragment.isAdded()) {
+                            for (Fragment fragment2 : fragment.getChildFragmentManager().getFragments()) {
+                                if ((fragment2 instanceof ServerPagesItemFragment) && ((ServerPagesItemFragment) fragment2).getPage() == 1) {
+                                    View fragmentView = fragment2.getView();
+                                    if (fragmentView != null) {
+                                        RecyclerView recyclerView = fragmentView.findViewById(R.id.server_recycler);
+                                        if (recyclerView != null && recyclerView.getAdapter() != null) {
+                                            recyclerView.getAdapter().notifyDataSetChanged();
                                         }
-                                    });
+                                    }
                                 }
                             }
                         }
                     }
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error refreshing hosted servers UI", e);
                 }
             }
-        }
+        });
+    }
+
+    public void refreshFavoriteServers()
+    {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+                        if (fragment instanceof ServersFragment && fragment.isAdded()) {
+                            for (Fragment fragment2 : fragment.getChildFragmentManager().getFragments()) {
+                                if ((fragment2 instanceof ServerPagesItemFragment) && ((ServerPagesItemFragment) fragment2).getPage() == 0) {
+                                    View fragmentView = fragment2.getView();
+                                    if (fragmentView != null) {
+                                        RecyclerView recyclerView = fragmentView.findViewById(R.id.server_recycler);
+                                        if (recyclerView != null && recyclerView.getAdapter() != null) {
+                                            recyclerView.getAdapter().notifyDataSetChanged();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error refreshing favorite servers UI", e);
+                }
+            }
+        });
     }
 
     public static void hideKeyboard(Activity activity) {

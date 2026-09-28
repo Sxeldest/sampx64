@@ -1,6 +1,6 @@
 package com.samp.mobile.launcher.fragments;
 
-import android.content.Intent;
+import android.content.Context;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -8,53 +8,81 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
-import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.SeekBar;
-import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.ToggleButton;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.fragment.app.Fragment;
 
 import com.joom.paranoid.Obfuscate;
 import com.samp.mobile.R;
 import com.samp.mobile.launcher.MainActivity;
-import com.samp.mobile.launcher.SplashActivity;
-import com.samp.mobile.launcher.util.ButtonAnimator;
 import com.samp.mobile.launcher.util.SharedPreferenceCore;
-import com.samp.mobile.launcher.util.Util;
 
-import org.ini4j.InvalidFileFormatException;
 import org.ini4j.Wini;
 
 import java.io.File;
-import java.io.IOException;
+
 @Obfuscate
 public class SettingsFragment extends Fragment {
 
-    Wini mWini = null;
-    EditText mNickName;
-    SwitchCompat mKeyboardSwitch;
-    SwitchCompat mVoiceSwitch;
-    SwitchCompat mModifySwitch;
-    SwitchCompat mFPSSwitch;
-    SwitchCompat mMonetSwitch;
-    SeekBar mMessagesSeekBar;
-    TextView mMessagesText;
-    SeekBar mFPSSeekBar;
-    TextView mFPSText;
+    private Wini mWini = null;
+    private EditText mNickName;
+    private SwitchCompat mKeyboardSwitch;
+    private SwitchCompat mVoiceSwitch;
+    private SwitchCompat mModifySwitch;
+    private SwitchCompat mFPSSwitch;
+    private SwitchCompat mMonetSwitch;
+    private SeekBar mMessagesSeekBar;
+    private TextView mMessagesText;
+    private SeekBar mFPSSeekBar;
+    private TextView mFPSText;
 
+    @Nullable
+    private File getIniFile() {
+        Context context = getContext();
+        if (context == null) return null;
+        File extDir = context.getExternalFilesDir(null);
+        if (extDir == null) return null;
+        File sampDir = new File(extDir, "SAMP");
+        if (!sampDir.exists()) {
+            sampDir.mkdirs();
+        }
+        return new File(sampDir, "settings.ini");
+    }
+
+    private void saveIniValue(String section, String key, Object value) {
+        try {
+            File iniFile = getIniFile();
+            if (iniFile == null) return;
+            if (mWini == null) {
+                if (!iniFile.exists()) {
+                    iniFile.createNewFile();
+                }
+                mWini = new Wini(iniFile);
+            }
+            mWini.put(section, key, value);
+            mWini.store();
+        } catch (Exception e) {
+            Log.e("SettingsFragment", "Error saving INI setting [" + section + "] " + key + "=" + value, e);
+        }
+    }
 
     @Override
-    public View onCreateView(LayoutInflater layoutInflater, ViewGroup viewGroup, Bundle bundle) {
+    public View onCreateView(@NonNull LayoutInflater layoutInflater, ViewGroup viewGroup, Bundle bundle) {
         View view = layoutInflater.inflate(R.layout.fragment_settings, viewGroup, false);
 
-        ((MainActivity)getActivity()).hideKeyboard(getActivity());
+        try {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).hideKeyboard(getActivity());
+            }
+        } catch (Exception e) {
+            Log.e("SettingsFragment", "Error hiding keyboard", e);
+        }
 
         mNickName = view.findViewById(R.id.settings_nickname);
         mKeyboardSwitch = view.findViewById(R.id.keyboard_switch);
@@ -67,195 +95,150 @@ public class SettingsFragment extends Fragment {
         mFPSSeekBar = view.findViewById(R.id.fps_seekbar);
         mFPSText = view.findViewById(R.id.fps_count);
 
-        File file = new File(getActivity().getExternalFilesDir(null) + "/SAMP/settings.ini");
-        try {
-            mWini = new Wini(file);
-
-            mNickName.setText(mWini.get("client", "name"));
-
-            mWini.store();
-        } catch (IOException e) {
-            e.printStackTrace();
+        File file = getIniFile();
+        if (file != null) {
+            try {
+                if (file.exists()) {
+                    mWini = new Wini(file);
+                    String nick = mWini.get("client", "name");
+                    if (nick != null && mNickName != null) {
+                        mNickName.setText(nick);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e("SettingsFragment", "Error reading INI file", e);
+            }
         }
-        mNickName.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
 
-            }
+        if (mNickName != null) {
+            mNickName.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
 
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                String text = charSequence.toString();
-                File file = new File(getActivity().getExternalFilesDir(null) + "/SAMP/settings.ini");
-                if(file.exists()) {
-                    try {
-                        if(mWini != null) {
-                            mWini.put("client", "name", text);
-                            mWini.store();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                @Override
+                public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+                    if (charSequence != null) {
+                        saveIniValue("client", "name", charSequence.toString());
                     }
                 }
-            }
 
-            @Override
-            public void afterTextChanged(Editable editable) {
+                @Override
+                public void afterTextChanged(Editable editable) {}
+            });
+        }
 
-            }
-        });
-
-        mModifySwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                new SharedPreferenceCore().setBoolean(requireContext().getApplicationContext(), "MODIFIED_DATA", b);
-            }
-        });
-
-        mKeyboardSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                new SharedPreferenceCore().setBoolean(requireContext().getApplicationContext(), "ANDROID_KEYBOARD", b);
-                try {
-                    if(mWini != null) {
-                        mWini.put("gui", "androidkeyboard", b);
-                        mWini.store();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        mVoiceSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                new SharedPreferenceCore().setBoolean(requireContext().getApplicationContext(), "VOICE_CHAT", b);
-                try {
-                    if(mWini != null) {
-                        mWini.put("gui", "VoiceChatEnable", b);
-                        mWini.store();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        mFPSSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                new SharedPreferenceCore().setBoolean(requireContext().getApplicationContext(), "FPS_DISPLAY", b);
-                try {
-                    if(mWini != null) {
-                        mWini.put("gui", "fps", b ? 1 : 0);
-                        mWini.store();
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-
-        mMonetSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
-                new SharedPreferenceCore().setBoolean(requireContext().getApplicationContext(), "MLOADER", b);
-            }
-        });
-
-        // perform seek bar change listener event used for getting the progress value
-        mMessagesSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int realProgress = 0;
-                switch(progress)
-                {
-                    case 0: {
-                        realProgress = 6;
-                        break;
-                    }
-                    case 1: {
-                        realProgress = 9;
-                        break;
-                    }
-                    case 2: {
-                        realProgress = 12;
-                        break;
-                    }
-                    case 3:{
-                        realProgress = 15;
-                        break;
+        if (mModifySwitch != null) {
+            mModifySwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                    Context context = getContext();
+                    if (context != null) {
+                        new SharedPreferenceCore().setBoolean(context.getApplicationContext(), "MODIFIED_DATA", b);
                     }
                 }
-                new SharedPreferenceCore().setInt(requireContext().getApplicationContext(), "MESSAGE_COUNT", realProgress);
-                File file = new File(getActivity().getExternalFilesDir(null) + "/SAMP/settings.ini");
-                if(file.exists()) {
-                    try {
-                        if(mWini != null) {
-                            mWini.put("gui", "ChatMaxMessages", realProgress);
-                            mWini.store();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
+            });
+        }
+
+        if (mKeyboardSwitch != null) {
+            mKeyboardSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                    Context context = getContext();
+                    if (context != null) {
+                        new SharedPreferenceCore().setBoolean(context.getApplicationContext(), "ANDROID_KEYBOARD", b);
+                    }
+                    saveIniValue("gui", "androidkeyboard", b);
+                }
+            });
+        }
+
+        if (mVoiceSwitch != null) {
+            mVoiceSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                    Context context = getContext();
+                    if (context != null) {
+                        new SharedPreferenceCore().setBoolean(context.getApplicationContext(), "VOICE_CHAT", b);
+                    }
+                    saveIniValue("gui", "VoiceChatEnable", b);
+                }
+            });
+        }
+
+        if (mFPSSwitch != null) {
+            mFPSSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                    Context context = getContext();
+                    if (context != null) {
+                        new SharedPreferenceCore().setBoolean(context.getApplicationContext(), "FPS_DISPLAY", b);
+                    }
+                    saveIniValue("gui", "fps", b ? 1 : 0);
+                }
+            });
+        }
+
+        if (mMonetSwitch != null) {
+            mMonetSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                    Context context = getContext();
+                    if (context != null) {
+                        new SharedPreferenceCore().setBoolean(context.getApplicationContext(), "MLOADER", b);
                     }
                 }
-                mMessagesText.setText(String.valueOf(realProgress));
-            }
+            });
+        }
 
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                // TODO Auto-generated method stub
-            }
-
-            public void onStopTrackingTouch(SeekBar seekBar) {
-            }
-        });
-
-        // perform seek bar change listener event used for getting the progress value
-        mFPSSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int realProgress = 0;
-                switch(progress)
-                {
-                    case 0: {
-                        realProgress = 30;
-                        break;
+        if (mMessagesSeekBar != null) {
+            mMessagesSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    int realProgress = 6;
+                    switch(progress) {
+                        case 0: realProgress = 6; break;
+                        case 1: realProgress = 9; break;
+                        case 2: realProgress = 12; break;
+                        case 3: realProgress = 15; break;
                     }
-                    case 1: {
-                        realProgress = 60;
-                        break;
+                    Context context = getContext();
+                    if (context != null) {
+                        new SharedPreferenceCore().setInt(context.getApplicationContext(), "MESSAGE_COUNT", realProgress);
                     }
-                    case 2: {
-                        realProgress = 90;
-                        break;
-                    }
-                    case 3:{
-                        realProgress = 120;
-                        break;
+                    saveIniValue("gui", "ChatMaxMessages", realProgress);
+                    if (mMessagesText != null) {
+                        mMessagesText.setText(String.valueOf(realProgress));
                     }
                 }
-                new SharedPreferenceCore().setInt(requireContext().getApplicationContext(), "FPS_LIMIT", realProgress);
-                File file = new File(getActivity().getExternalFilesDir(null) + "/SAMP/settings.ini");
-                if(file.exists()) {
-                    try {
-                        if(mWini != null) {
-                            mWini.put("gui", "FPSLimit", realProgress);
-                            mWini.store();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
+
+                public void onStartTrackingTouch(SeekBar seekBar) {}
+                public void onStopTrackingTouch(SeekBar seekBar) {}
+            });
+        }
+
+        if (mFPSSeekBar != null) {
+            mFPSSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    int realProgress = 30;
+                    switch(progress) {
+                        case 0: realProgress = 30; break;
+                        case 1: realProgress = 60; break;
+                        case 2: realProgress = 90; break;
+                        case 3: realProgress = 120; break;
+                    }
+                    Context context = getContext();
+                    if (context != null) {
+                        new SharedPreferenceCore().setInt(context.getApplicationContext(), "FPS_LIMIT", realProgress);
+                    }
+                    saveIniValue("gui", "FPSLimit", realProgress);
+                    if (mFPSText != null) {
+                        mFPSText.setText(String.valueOf(realProgress));
                     }
                 }
-                mFPSText.setText(String.valueOf(realProgress));
-            }
 
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                // TODO Auto-generated method stub
-            }
-
-            public void onStopTrackingTouch(SeekBar seekBar) {
-            }
-        });
-
+                public void onStartTrackingTouch(SeekBar seekBar) {}
+                public void onStopTrackingTouch(SeekBar seekBar) {}
+            });
+        }
 
         return view;
     }
@@ -264,30 +247,53 @@ public class SettingsFragment extends Fragment {
     public void onResume() {
         super.onResume();
 
-        mKeyboardSwitch.setChecked(new SharedPreferenceCore().getBoolean(requireContext().getApplicationContext(), "ANDROID_KEYBOARD"));
-        mVoiceSwitch.setChecked(new SharedPreferenceCore().getBoolean(requireContext().getApplicationContext(), "VOICE_CHAT"));
-        mFPSSwitch.setChecked(new SharedPreferenceCore().getBoolean(requireContext().getApplicationContext(), "FPS_DISPLAY"));
-        mModifySwitch.setChecked(new SharedPreferenceCore().getBoolean(requireContext().getApplicationContext(), "MODIFIED_DATA"));
-        mMonetSwitch.setChecked(new SharedPreferenceCore().getBoolean(requireContext().getApplicationContext(), "MLOADER"));
+        Context context = getContext();
+        if (context == null) return;
 
-        int fps = new SharedPreferenceCore().getInt(getContext(), "FPS_LIMIT");
-        switch (fps)
-        {
-            case 30: mFPSSeekBar.setProgress(0); break;
-            case 60: mFPSSeekBar.setProgress(1); break;
-            case 90: mFPSSeekBar.setProgress(2); break;
-            case 120: mFPSSeekBar.setProgress(3); break;
-        }
-        mFPSText.setText(String.valueOf(fps));
+        try {
+            if (mKeyboardSwitch != null) {
+                mKeyboardSwitch.setChecked(new SharedPreferenceCore().getBoolean(context.getApplicationContext(), "ANDROID_KEYBOARD"));
+            }
+            if (mVoiceSwitch != null) {
+                mVoiceSwitch.setChecked(new SharedPreferenceCore().getBoolean(context.getApplicationContext(), "VOICE_CHAT"));
+            }
+            if (mFPSSwitch != null) {
+                mFPSSwitch.setChecked(new SharedPreferenceCore().getBoolean(context.getApplicationContext(), "FPS_DISPLAY"));
+            }
+            if (mModifySwitch != null) {
+                mModifySwitch.setChecked(new SharedPreferenceCore().getBoolean(context.getApplicationContext(), "MODIFIED_DATA"));
+            }
+            if (mMonetSwitch != null) {
+                mMonetSwitch.setChecked(new SharedPreferenceCore().getBoolean(context.getApplicationContext(), "MLOADER"));
+            }
 
-        int message = new SharedPreferenceCore().getInt(getContext(), "MESSAGE_COUNT");
-        switch (message)
-        {
-            case 6: mMessagesSeekBar.setProgress(0); break;
-            case 9: mMessagesSeekBar.setProgress(1); break;
-            case 12: mMessagesSeekBar.setProgress(2); break;
-            case 15: mMessagesSeekBar.setProgress(3); break;
+            int fps = new SharedPreferenceCore().getInt(context, "FPS_LIMIT");
+            if (mFPSSeekBar != null) {
+                switch (fps) {
+                    case 30: mFPSSeekBar.setProgress(0); break;
+                    case 60: mFPSSeekBar.setProgress(1); break;
+                    case 90: mFPSSeekBar.setProgress(2); break;
+                    case 120: mFPSSeekBar.setProgress(3); break;
+                }
+            }
+            if (mFPSText != null) {
+                mFPSText.setText(String.valueOf(fps));
+            }
+
+            int message = new SharedPreferenceCore().getInt(context, "MESSAGE_COUNT");
+            if (mMessagesSeekBar != null) {
+                switch (message) {
+                    case 6: mMessagesSeekBar.setProgress(0); break;
+                    case 9: mMessagesSeekBar.setProgress(1); break;
+                    case 12: mMessagesSeekBar.setProgress(2); break;
+                    case 15: mMessagesSeekBar.setProgress(3); break;
+                }
+            }
+            if (mMessagesText != null) {
+                mMessagesText.setText(String.valueOf(message));
+            }
+        } catch (Exception e) {
+            Log.e("SettingsFragment", "Error updating settings UI in onResume", e);
         }
-        mMessagesText.setText(String.valueOf(message));
     }
 }

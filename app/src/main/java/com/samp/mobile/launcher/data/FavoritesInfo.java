@@ -20,7 +20,10 @@ public class FavoritesInfo {
     private static ArrayList<FavoriteServerData> serverList = new ArrayList<>();
 
     public static void Load(Context mContext) {
-        File file = new File(mContext.getExternalFilesDir(null), "SAMP/favorites.json");
+        if (mContext == null) return;
+        File extDir = mContext.getExternalFilesDir(null);
+        if (extDir == null) return;
+        File file = new File(extDir, "SAMP/favorites.json");
         if (!file.exists()) {
             ClearFavorites();
             return;
@@ -55,8 +58,11 @@ public class FavoritesInfo {
     }
 
     public static void Save(Context context) {
+        if (context == null) return;
+        File extDir = context.getExternalFilesDir(null);
+        if (extDir == null) return;
         try {
-            File file = new File(context.getExternalFilesDir(null), "SAMP/favorites.json");
+            File file = new File(extDir, "SAMP/favorites.json");
             if (file.exists()) {
                 file.delete();
             }
@@ -72,7 +78,7 @@ public class FavoritesInfo {
                 jSONObject2.put("ip", favoriteServerData.ip);
                 jSONObject2.put("port", favoriteServerData.port);
             }
-            new File(context.getExternalFilesDir(null), "SAMP/").mkdirs();
+            new File(extDir, "SAMP/").mkdirs();
             file.createNewFile();
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file));
             bufferedWriter.write(jSONObject.toString());
