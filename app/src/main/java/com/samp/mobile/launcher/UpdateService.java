@@ -2,8 +2,6 @@ package com.samp.mobile.launcher;
 
 import android.app.Service;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -166,6 +164,18 @@ public class UpdateService extends Service {
                     }
 
                     setUpdateStatus(UpdateActivity.UpdateStatus.Undefined);
+
+                    Message obtain = Message.obtain(mInHandler, 5);
+                    obtain.getData().putString("status", mGameStatus.name());
+                    obtain.replyTo = mMessenger;
+                    Messenger messenger = mActivityMessenger;
+                    if (messenger != null) {
+                        try {
+                            messenger.send(obtain);
+                        } catch (RemoteException e5) {
+                            e5.printStackTrace();
+                        }
+                    }
 
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -524,14 +534,7 @@ public class UpdateService extends Service {
     }
 
     public boolean isGameUpdateExists() {
-        PackageInfo packageInfo = null;
-        try {
-            packageInfo = getPackageManager().getPackageInfo("com.samp.mobile", PackageManager.GET_ACTIVITIES);
-        } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
-        }
-        Log.d("x1y2z", "isGameUpdateExists -> currentVersion " + packageInfo.versionCode + " | mUpdateVersion " + this.mUpdateVersion);
-        return packageInfo.versionCode == this.mUpdateVersion ? false:true;
+        return false;
     }
 
     private void sendLoadingScreen(boolean unpacking, String filename, long current, long total) {

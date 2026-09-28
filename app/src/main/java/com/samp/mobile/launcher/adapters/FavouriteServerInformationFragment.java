@@ -114,7 +114,7 @@ public class FavouriteServerInformationFragment extends Dialog {
                 dismiss();
                 //} catch (IOException e) {
                 //    e.printStackTrace();
-               // }
+                // }
             }
         });
 

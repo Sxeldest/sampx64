@@ -75,14 +75,14 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
 
+        prefs = getSharedPreferences("com.samp.mobile", MODE_PRIVATE);
+
         if(!SignatureChecker.isSignatureValid(this, getPackageName()))
         {
             ((TextView)findViewById(R.id.launcher_orig_text)).setText("Using not original launcher");
         }
         else {
             Config.currentContext = this;
-
-            prefs = getSharedPreferences("com.samp.mobile", MODE_PRIVATE);
 
             builder = new AlertDialog.Builder(this);
 
@@ -285,7 +285,7 @@ public class SplashActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
-        if (prefs.getBoolean("firstrun", true)) {
+        if (prefs != null && prefs.getBoolean("firstrun", true)) {
             new SharedPreferenceCore().setInt(getApplicationContext(), "FPS_LIMIT", 60);
             new SharedPreferenceCore().setInt(getApplicationContext(), "MESSAGE_COUNT", 6);
             new SharedPreferenceCore().setBoolean(getApplicationContext(), "VOICE_CHAT", true);
